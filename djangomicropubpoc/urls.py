@@ -20,5 +20,6 @@ from django.urls import path, include
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('myapp.urls', namespace='myapp')),
-    path('indieauth/', include('indieauth.urls', namespace='indieauth'))
+    path('indieauth/', include('indieauth.urls', namespace='indieauth')),
+    path('micropub/', include('micropub.urls', namespace='micropub'))
 ]

@@ -4,6 +4,8 @@
         <title>My App</title>
 
         <link rel="authorization_endpoint" href="{% url 'indieauth:authorization' %}">
+        <link rel="token_endpoint" href="{% url 'indieauth:token' %}">
+        <link rel="token_endpoint" href="{% url 'micropub:micropub' %}">
     </head>
     <body>
         <p>Hello, world!</p>
