@@ -1,16 +1,42 @@
 from django.shortcuts import render
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect, HttpResponseBadRequest
 from django.urls import reverse
 from django.views.generic import View
 from indieauth.authrequest import AuthRequest
+from indieauth.validator import Validator
 
+from oauthlib.oauth2 import WebApplicationServer, FatalClientError, OAuth2Error
+
+validator = Validator()
+server = WebApplicationServer(validator)
 
 # Create your views here.
 def index(request):
     return HttpResponse(status=404)
 
 class AuthView(View):
+    def __init__(self, **kwargs):
+        self._authorization_endpoint = server
+        super().__init__(**kwargs)
+
+    def extract_params(self, request): 
+        return (request.build_absolute_uri() ,request.method, request.body, request.headers)
+    
+    def response_from_error(self, error):
+        return HttpResponseBadRequest(error)
+
     def get(self, request, *args, **kwargs):
+        uri, http_method, body, headers = self.extract_params(request)
+
+        try:
+            scopes, credentials = self._authorization_endpoint.validate_authorization_request(uri,http_method,body,headers)
+            return HttpResponse()
+        except FatalClientError as e:
+            return self.response_from_error(e)
+        
+        except OAuth2Error as e:
+            return HttpResponseRedirect(e.in_uri(e.redirect_uri))
+
         auth_request = AuthRequest(request.GET)
         auth_request.validate()
 

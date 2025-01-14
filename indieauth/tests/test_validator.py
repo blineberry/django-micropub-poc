@@ -2,6 +2,7 @@ from django.test import TestCase, Client
 from django.test import Client
 from oauthlib.common import Request
 from indieauth.validator import Validator
+from unittest.mock import MagicMock, patch
 
 # Create your tests here.
 class ValidatorTestCase(TestCase):
@@ -103,13 +104,96 @@ class ValidatorTestCase(TestCase):
 
         self.assertFalse(result)
 
-    def test_authenticate_client_client_id_domain_returns_false(self):
+    @patch('indieauth.validator.requests')
+    def test_authenticate_client_clientidresponseisnotjson_returns_false(self, mock_requests):
+        client_id = "https://example.com/client_id"
         request = Request("https://example.com", body= {
-            "client_id": "https://example.com/"
+            "client_id": client_id
         })
         validator = Validator()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value(side_effect=Exception('Boom!'))
+        mock_requests.get.return_value = mock_response
 
         result = validator.authenticate_client(request)
 
+        mock_requests.get.assert_called_with(client_id)
+        self.assertFalse(result)
+
+    @patch('indieauth.validator.requests')
+    def test_authenticate_client_clientidresponsenoclientid_returns_false(self, mock_requests):
+        client_id = "https://example.com/client_id"
+        request = Request("https://example.com", body= {
+            "client_id": client_id
+        })
+        validator = Validator()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {}
+        mock_requests.get.return_value = mock_response
+
+        result = validator.authenticate_client(request)
+
+        mock_requests.get.assert_called_with(client_id)
+        self.assertFalse(result)
+
+    @patch('indieauth.validator.requests')
+    def test_authenticate_client_clientidresponseincludesclientsecretpost_returns_false(self, mock_requests):
+        client_id = "https://example.com/client_id"
+        request = Request("https://example.com", body= {
+            "client_id": client_id
+        })
+        validator = Validator()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "client_id": client_id,
+            "token_endpoint_auth_method": "client_secret_post"
+        }
+        mock_requests.get.return_value = mock_response
+
+        result = validator.authenticate_client(request)
+
+        mock_requests.get.assert_called_with(client_id)
+        self.assertFalse(result)
+
+    @patch('indieauth.validator.requests')
+    def test_authenticate_client_clientidresponseincludesclientsecretpost_returns_false(self, mock_requests):
+        client_id = "https://example.com/client_id"
+        request = Request("https://example.com", body= {
+            "client_id": client_id
+        })
+        validator = Validator()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "client_id": client_id,
+            "token_endpoint_auth_method": "client_secret_basic"
+        }
+        mock_requests.get.return_value = mock_response
+
+        result = validator.authenticate_client(request)
+
+        mock_requests.get.assert_called_with(client_id)
+        self.assertFalse(result)
+
+    @patch('indieauth.validator.requests')
+    def test_authenticate_client_clientidresponseincludesclientsecretpost_returns_false(self, mock_requests):
+        client_id = "https://example.com/client_id"
+        request = Request("https://example.com", body= {
+            "client_id": client_id
+        })
+        validator = Validator()
+        mock_response = MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            "client_id": client_id
+        }
+        mock_requests.get.return_value = mock_response
+
+        result = validator.authenticate_client(request)
+
+        mock_requests.get.assert_called_with(client_id)
         self.assertTrue(result)
 
