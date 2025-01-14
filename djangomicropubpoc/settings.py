@@ -36,6 +36,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 # Application definition
 
 INSTALLED_APPS = [
+    'indieauth.apps.IndieauthConfig',
     'myapp.apps.MyAppConfig',
     'django.contrib.admin',
     'django.contrib.auth',
