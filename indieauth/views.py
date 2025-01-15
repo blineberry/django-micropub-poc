@@ -30,7 +30,13 @@ class AuthView(View):
 
         try:
             scopes, credentials = self._authorization_endpoint.validate_authorization_request(uri,http_method,body,headers)
-            return HttpResponse()
+            
+            #request.session['oauth2_credentials'] = credentials
+            
+            return render(request, "indieauth/auth.html", { 
+                "scopes": scopes,
+                "credentials": credentials
+            })
         
         # Errors that should be shown to the user on the provider website
         except FatalClientError as e:
@@ -39,14 +45,7 @@ class AuthView(View):
         # Errors embedded in the redirect URI back to the client
         except OAuth2Error as e:
             return HttpResponseRedirect(e.in_uri(e.redirect_uri))
-
-        auth_request = AuthRequest(request.GET)
-        auth_request.validate()
-
-        if auth_request.is_valid is False:
-            return HttpResponse(status=400, content=auth_request.validation_error)
-
-        return JsonResponse(vars(auth_request))
+        
     def post(self, request, *args, **kwargs):
         return HttpResponse(status=501)
 

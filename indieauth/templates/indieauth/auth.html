@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+    <head>
+    <title></title>
+    </head>
+    <body>
+        <h1>Authorize access to {{ credentials.client_id }}</h1>
+        <form method="post">
+            {% csrf_token %}
+            {% for scope in scopes %}
+            <label><input type="checkbox" name="scopes" value="{{ scope }}"> {{ scope }}</label>
+            {% endfor %}
+            <input type="submit" value="Authorize">
+        </form>
+    </body>
+</html>

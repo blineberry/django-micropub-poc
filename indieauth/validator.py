@@ -4,6 +4,9 @@ from django.core.validators import URLValidator
 from urllib.parse import urlparse
 import ipaddress
 import requests
+from django.conf import settings
+from django.shortcuts import render
+
 
 class Validator(RequestValidator):
     def validate_client_id(self, client_id, request, *args, **kwargs):
@@ -20,9 +23,13 @@ class Validator(RequestValidator):
         if self.__is_client_metadata_valid(client_response, client_id) is False:
             raise FatalClientError("client_id response invalid")
         
-        request.client = client_response.json()
+        request.client = dict(client_response.json())
 
         return True
+    
+    def client_authentication_required(self, request, *args, **kwargs):
+        #IndieAuth clients are public
+        return False
     
     def get_default_redirect_uri(self, client_id, request, *args, **kwargs):
         # IndieAuth clients do not have a default redirect_uri
@@ -57,9 +64,9 @@ class Validator(RequestValidator):
     def get_default_scopes(self, client_id, request, *args, **kwargs):
         return []
     
-    def client_authentication_required(self, request, *args, **kwargs):
-        #IndieAuth clients are public
-        return False
+    def validate_scopes(self, client_id, scopes, client, request, *args, **kwargs):
+        # not sure about this one.
+        return True
 
     def authenticate_client_id(self, client_id, request, *args, **kwargs):
         return super().authenticate_client_id(self, client_id, request, *args, **kwargs)
