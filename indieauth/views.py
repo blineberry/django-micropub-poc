@@ -31,9 +31,12 @@ class AuthView(View):
         try:
             scopes, credentials = self._authorization_endpoint.validate_authorization_request(uri,http_method,body,headers)
             return HttpResponse()
+        
+        # Errors that should be shown to the user on the provider website
         except FatalClientError as e:
             return self.response_from_error(e)
         
+        # Errors embedded in the redirect URI back to the client
         except OAuth2Error as e:
             return HttpResponseRedirect(e.in_uri(e.redirect_uri))
 
