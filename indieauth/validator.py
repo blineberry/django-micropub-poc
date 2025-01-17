@@ -1,29 +1,27 @@
 from oauthlib.oauth2 import RequestValidator, FatalClientError
-from .models import Client
 from django.core.validators import URLValidator
 from urllib.parse import urlparse
 import ipaddress
 import requests
 from django.conf import settings
 from django.shortcuts import render
+from .models import AuthorizationCode, Client, BearerToken
+from django.utils import timezone
+import datetime
 
 
 class Validator(RequestValidator):
+    def is_pkce_required(self, client_id, request):
+        return True
+    
     def validate_client_id(self, client_id, request, *args, **kwargs):
         if self.__is_client_id_valid(client_id) is False:
             raise FatalClientError("client_id invalid")
 
-        client_response = requests.get(client_id)
+       
+        client = self.fetch_client_metadata(client_id)         
 
-        try:
-            client_response.raise_for_status()
-        except:
-            raise FatalClientError("client_id request not successful")
-        
-        if self.__is_client_metadata_valid(client_response, client_id) is False:
-            raise FatalClientError("client_id response invalid")
-        
-        request.client = dict(client_response.json())
+        request.client = client
 
         return True
     
@@ -67,26 +65,91 @@ class Validator(RequestValidator):
     def validate_scopes(self, client_id, scopes, client, request, *args, **kwargs):
         # not sure about this one.
         return True
+    
+    def save_authorization_code(self, client_id, code, request, *args, **kwargs):
+        # A maximum lifetime of 10 minutes is recommended. 
+        # https://indieauth.spec.indieweb.org/#authorization-response
+        lifetime =  datetime.timedelta(minutes=10)        
+        print('challenge_method: ' + str(code.get('code_challenge_method')))
+        code = AuthorizationCode(
+            client_id=client_id, 
+            redirect_uri=request.redirect_uri, 
+            code=code.get('code'),
+            expires_at=timezone.now() + lifetime,
+            user=request.user, 
+            scopes=' '.join(request.scopes), 
+            challenge=request.code_challenge, 
+            challenge_method=request.code_challenge_method)
+        code.save()
 
     def authenticate_client_id(self, client_id, request, *args, **kwargs):
-        return super().authenticate_client_id(self, client_id, request, *args, **kwargs)
-        if self.__is_client_id_valid(client_id) is False:
-            return False        
-        
-        client_response = requests.get(client_id)
-
+        return self.validate_client_id(client_id, request)
+    
+    def validate_grant_type(self, client_id, grant_type, client, request, *args, **kwargs):
+        # Require grant_type=authorization_code when redeeming the authorization
+        # code at the authorization endpoint
+        # https://indieauth.spec.indieweb.org/#changes-from-25-january-2020-to-09-august-2020
+        return grant_type == 'authorization_code'
+    
+    def validate_code(self, client_id, code, client, request, *args, **kwargs):
         try:
-            client_response.raise_for_status()
+            authCode = AuthorizationCode.objects.get(code=code,client_id=client_id)            
         except:
-            return False        
-        
-        if self.__is_client_metadata_valid(client_response, client_id) is False:
             return False
         
-        request.client = client_response.json()
+        # If the client omits this value, the authorization server MUST NOT 
+        # issue an access token for this authorization code. Only the user's 
+        # profile URL may be returned without any scope requested.
+        # https://indieauth.spec.indieweb.org/#authorization-request
+        if authCode.scopes is None or len(authCode.scopes) < 1:
+            return False
+        
+        # All IndieAuth clients MUST use PKCE ([RFC7636]) to protect against 
+        # authorization code injection and CSRF attacks.
+        # https://indieauth.spec.indieweb.org/#authorization-request-p-2
+        if not authCode.challenge or not authCode.challenge_method:
+            return False
+        
+        if authCode.expires_at < timezone.now():
+            return False
+
+        print(authCode.scopes)
+        request.user = authCode.user
+        request.scopes = authCode.scopes.split(' ')
+        request.code_challenge = authCode.challenge
+        request.code_challenge_method = authCode.challenge_method
+
+        print(authCode.challenge)
 
         return True
+    
+    def get_code_challenge(self, code, request):
+        return request.code_challenge
+    
+    def get_code_challenge_method(self, code, request):
+        return request.code_challenge_method
+    
+    def confirm_redirect_uri(self, client_id, code, redirect_uri, client, request, *args, **kwargs):
+        try:
+            auth_code = AuthorizationCode.objects.get(code=code, client_id=client_id)
+            return redirect_uri == auth_code.redirect_uri
+        except:
+            return False
+        
+    def save_bearer_token(self, token, request, *args, **kwargs):
+        token = BearerToken(
+            client_id=request.client.client_id, 
+            user=request.user,
+            scopes=token.get('scope'),
+            access_token=token.get('access_token'),
+            refresh_token=token.get('refresh_token'),
+            expires_at=timezone.now() + datetime.timedelta(seconds=token.get('expires_in')))
+        
+        token.save()
 
+    def invalidate_authorization_code(self, client_id, code, request, *args, **kwargs):
+        AuthorizationCode.objects.filter(client_id=client_id,code=code).delete()
+        
     def authenticate_client(self, request, *args, **kwargs):
         return super().authenticate_client(self, request, *args, **kwargs)
         """
@@ -246,3 +309,25 @@ class Validator(RequestValidator):
             pass
         
         return True
+    
+    def fetch_client_metadata(self, client_id):
+        client_response = requests.get(client_id)
+
+        try:
+            client_response.raise_for_status()
+        except:
+            raise FatalClientError("client_id request not successful")
+        
+        if self.__is_client_metadata_valid(client_response, client_id) is False:
+            raise FatalClientError("client_id response invalid")
+
+        json = client_response.json()
+        client = Client(
+            client_id=client_id,
+            client_name=json.get('client_name', None),
+            client_uri=json.get('client_uri'),
+            logo_uri=json.get('logo_uri', None),
+            redirect_uris=json.get('redirect_uris', None)
+        )
+
+        return client

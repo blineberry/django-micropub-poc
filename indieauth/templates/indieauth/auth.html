@@ -7,10 +7,12 @@
         <h1>Authorize access to {{ credentials.client_id }}</h1>
         <form method="post">
             {% csrf_token %}
-            {% for scope in scopes %}
-            <label><input type="checkbox" name="scopes" value="{{ scope }}"> {{ scope }}</label>
-            {% endfor %}
-            <input type="submit" value="Authorize">
+            <p>
+                {% for scope in scopes %}
+                <div><label><input type="checkbox" name="scopes" value="{{ scope }}" checked> {{ scope }}</label></div>
+                {% endfor %}
+            </p>
+            <p><input type="submit" value="Authorize"></p>
         </form>
     </body>
 </html>
