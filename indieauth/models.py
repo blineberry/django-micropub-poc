@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+import datetime
 
 
 # Create your models here.
@@ -46,6 +47,27 @@ class BearerToken(models.Model):
     access_token = models.CharField(max_length=100, unique=True)
     refresh_token = models.CharField(max_length=100, unique=True)
     expires_at = models.DateTimeField()
+    issued_at = models.DateTimeField(default = timezone.now)
+    me = models.URLField(max_length=2048)
+
+    def _get_exp(self):
+        return int(round(self.expires_at.timestamp()))
+    
+    def _set_exp(self, timestamp):
+        self.expires_at = datetime.datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+    def _get_iat(self):
+        return int(round(self.issued_at.timestamp()))
+    
+    def _set_iat(self, timestamp):
+        self.issued_at = datetime.datetime.fromtimestamp(timestamp, tz=timezone.utc)
+
+    def _get_is_expired(self):
+        return self.expires_at < timezone.now()
+
+    exp = property(_get_exp, _set_exp, doc="Integer timestamp, measured in the number of seconds since January 1 1970 UTC, indicating when this token will expire")
+    iat = property(_get_iat, _set_iat)
+    is_expired = property(_get_is_expired)
 
 class AuthorizationCode(models.Model):
     client_id = models.URLField(max_length=2048)   

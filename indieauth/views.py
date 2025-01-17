@@ -120,12 +120,26 @@ class IntrospectView(View):
                 uri, http_method, body, headers)
         
         return HttpResponse(body, headers=headers, status=status)
+    
+@method_decorator(csrf_exempt, name="dispatch")
+class RevocationView(View):
+    def __init__(self, **kwargs):
+        self._revocation_endpoint = server
+
+    def post(self, request, *args, **kwargs):
+        uri, http_method, body, headers = extract_params(request)
+
+        headers, body, status = self._revocation_endpoint.create_revocation_response(
+            uri, http_method, body, headers)
+        
+        return HttpResponse(body, headers=headers, status=status)
 
 def metadata(request):
     return JsonResponse({
         "issuer": request.build_absolute_uri(reverse("indieauth:issuer")),
         "authorization_endpoint": request.build_absolute_uri(reverse("indieauth:authorization")),
         "token_endpoint": request.build_absolute_uri(reverse("indieauth:token")),
+        "revocation_endpoint": request.build_absolute_uri(reverse("indieauth:revocation")),
         "scopes_supported": [],
         "introspection_endpoint": request.build_absolute_uri(reverse("indieauth:introspect")),
         "code_challenge_methods_supported": ["S256"]

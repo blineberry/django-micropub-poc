@@ -8,6 +8,7 @@ from django.shortcuts import render
 from .models import AuthorizationCode, Client, BearerToken
 from django.utils import timezone
 import datetime
+from django.db.models import Q
 
 
 class Validator(RequestValidator):
@@ -149,6 +150,31 @@ class Validator(RequestValidator):
 
     def invalidate_authorization_code(self, client_id, code, request, *args, **kwargs):
         AuthorizationCode.objects.filter(client_id=client_id,code=code).delete()
+
+    def introspect_token(self, token, token_type_hint, request, *args, **kwargs):
+        try:
+            result = BearerToken.objects.get(access_token=token)
+        except Exception as e:  
+            try:
+                result = BearerToken.objects.get(refresh_token=token)
+            except Exception as e:
+                return None
+
+        if result.is_expired:
+            return None
+        
+        return {
+            "active": True,
+            "me": result.me,
+            "client_id": result.client_id,
+            "scope": result.scopes,
+            "exp": result.exp,
+            "iat": result.iat
+        }
+    
+    def revoke_token(self, token, token_type_hint, request, *args, **kwargs):
+        BearerToken.objects.filter(
+            Q(access_token=token) | Q(refresh_token=token)).delete()
         
     def authenticate_client(self, request, *args, **kwargs):
         return super().authenticate_client(self, request, *args, **kwargs)
