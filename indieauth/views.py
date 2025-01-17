@@ -107,10 +107,19 @@ class TokenView(View):
                 uri, http_method, body, headers, {})
 
         return HttpResponse(body, headers=headers, status=status)
-        return HttpResponse(status=501)
 
-def introspect(request):
-    return HttpResponse(status=501)
+@method_decorator(csrf_exempt, name="dispatch")
+class IntrospectView(View):
+    def __init__(self, **kwargs):
+        self._introspect_endpoint = server
+
+    def post(self, request, *args, **kwargs):
+        uri, http_method, body, headers = extract_params(request)
+
+        headers, body, status = self._introspect_endpoint.create_introspect_response(
+                uri, http_method, body, headers)
+        
+        return HttpResponse(body, headers=headers, status=status)
 
 def metadata(request):
     return JsonResponse({
