@@ -8,6 +8,11 @@
         <link rel="micropub" href="{% url 'micropub:micropub' %}">
     </head>
     <body>
-        <p>Hello, world!</p>
+        <nav>
+            <ul>
+                <li><a href="{% url 'client:index' %}">IndieAuth client</a></li>
+                <li><a href="{% url 'mysite:index' %}">User website</a></li>
+            </ul>
+        </nav>
     </body>
 </html>

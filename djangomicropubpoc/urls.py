@@ -21,5 +21,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('myapp.urls', namespace='myapp')),
     path('indieauth/', include('indieauth.urls', namespace='indieauth')),
-    path('micropub/', include('micropub.urls', namespace='micropub'))
+    path('micropub/', include('micropub.urls', namespace='micropub')),
+    path('client/', include('client.urls', namespace='client')),
+    path('mysite/', include('mysite.urls', namespace='mysite'))
 ]

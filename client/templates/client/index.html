@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>My App</title>
+
+        <link rel="authorization_endpoint" href="{% url 'indieauth:authorization' %}">
+        <link rel="token_endpoint" href="{% url 'indieauth:token' %}">
+        <link rel="micropub" href="{% url 'micropub:micropub' %}">
+    </head>
+    <body>
+        <form method="post">
+            {% csrf_token %}
+            {% if error %}
+                <p>Error: {{ error }}</p>
+            {% endif %}
+            <p><label for="user-profile-url">Your website</label>
+                <input type="url" name="user-profile-url" value="{{ userprofileurl }}">
+            </p>
+            <p>
+                <input type="submit" value="Sign in">
+            </p>
+        </form>
+    </body>
+</html>

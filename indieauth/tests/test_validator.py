@@ -1,5 +1,4 @@
 from django.test import TestCase, Client
-from django.test import Client
 from oauthlib.common import Request
 from indieauth.validator import Validator
 from unittest.mock import MagicMock, patch

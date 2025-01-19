@@ -31,10 +31,28 @@ RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
 if RENDER_EXTERNAL_HOSTNAME:
         ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
+LOGGING = {
+    "version": 1,  # the dictConfig format version
+    "disable_existing_loggers": False,  # retain the default loggers
+    "handlers": {
+          "console": {
+                "level": "DEBUG",
+                "class": "logging.StreamHandler"
+          }    
+    },
+    "loggers": {
+          "": {
+                "handlers": ["console"],
+                "level": "DEBUG"
+          }
+    }
+}
 
 # Application definition
 
 INSTALLED_APPS = [
+    'mysite.apps.MysiteConfig',
+    'client.apps.ClientConfig',
     'indieauth.apps.IndieauthConfig',
     'myapp.apps.MyAppConfig',
     'django.contrib.admin',
