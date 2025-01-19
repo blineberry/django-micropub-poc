@@ -4,4 +4,4 @@ gunicorn==23.0.0
 uvicorn==0.34.0
 requests==2.32.3
 oauthlib==3.2.2
-beautifulsoup4=4.12.3
+beautifulsoup4==4.12.3
