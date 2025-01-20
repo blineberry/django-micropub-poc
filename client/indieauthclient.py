@@ -4,39 +4,134 @@ from django.core.validators import URLValidator
 import ipaddress
 import requests
 from bs4 import BeautifulSoup
+import logging
+from oauthlib.oauth2 import WebApplicationClient
 
+logger = logging.getLogger(__name__)
 
 class Request:
-    def __init__(self, profile_url=None):
-        self.profile_url = profile_url
+    response_type = "code"
+
+    def __init__(self, user_profile_url=None, client_id=None, redirect_uri=None):
+        self.profile_url = user_profile_url
+        self.client_id = client_id
+        self.redirect_uri = redirect_uri
+
+    @staticmethod
+    def generate_state():
         pass
 
-class Client:
-    def create_login_response(self, request):
-        if request.profile_url is None:
+class IndieAuthClient(WebApplicationClient):
+    def __init__(self, client_id, user_profile_url, code = None, **kwargs):
+        self.submitted_user_profile_url = user_profile_url
+
+        if user_profile_url is None:
+            logger.debug("Profile url: %s" % user_profile_url)
             raise InvalidProfileUrlException("Profile url is required.")
         
-        if not self.validate_profile_url(request.profile_url, request):
+        self.user_profile_url = self.canonicalize_url(user_profile_url)
+        if not self.validate_profile_url(self.user_profile_url):
+            raise InvalidProfileUrlException()
+        
+        logger.debug("Profile url: %s" % user_profile_url)
+
+        if not self.validate_profile_url(user_profile_url):
             raise InvalidProfileUrlException("Profile url failed validation.")
 
-        authorization_endpoint = self.get_authorization_endpoint(request.profile_url, request)
+        super().__init__(client_id, code, **kwargs)
 
-        headers = {
-            "Location": add_params_to_uri(authorization_endpoint, [
-                ("response_type", request.response_type),
-                ("client_id" , request.client_id),
-                ("redirect_uri" , request.redirect_uri),
-                ("state", request.state),
-                ("code_challenge", request.code_challenge),
-                ("code_challenge_method", request.code_challenge_method),
-                ("scope", "create update profile"),
-                ("me", request.profile_url)
-            ])
+    def get_user_metadata(self, user_profile_url):
+        self.user_profile_url = user_profile_url
+
+        self.user_metadata = {
+            "indieauth-metadata": None,
+            "authorization_endpoint": None,
+            "token_endpoint": None
+        }
+        
+        response = requests.get(self.user_profile_url)
+
+        logger.debug("Profile url response: %s" % response)
+
+        try:
+            response.raise_for_status()
+        except Exception as e:
+            logger.debug("Profile url exception: %s" % e)
+            raise UserMetadataException("Non-successful response from profile url.")
+        
+        logger.debug("Headers: %s" % response.headers)
+        link_headers = response.headers.get('Link', "")
+        logger.debug("Link headers: %s" % link_headers)
+
+        for header in link_headers.split(","):
+            logger.debug("Header: %s" % header)
+            pair = header.split(":")
+
+            if pair[0].strip() == "rel" and pair[1].strip() == "indieauth-metadata":
+                logger.debug("Link %s: %s" % (pair[0], pair[1]))
+                self.user_metadata.update({"indieauth-metadata" : pair[1]})
+                return self.user_metadata
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        html_links = soup.find_all('link')
+
+        for link in html_links:
+            logger.debug("link: %s", link)
+            logger.debug("link rel: %s", link.get('rel'))
+            logger.debug("link href: %s", link.get('href'))
+
+            if "indieauth-metadata" in link.get('rel') and self.user_metadata.get("indieauth-metadata") is None:
+                self.user_metadata.update({"indieauth-metadata" : link.get('href')})
+                return self.user_metadata
+            
+            if "authorization_endpoint" in link.get('rel') and self.user_metadata.get("authorization_endpoint") is None:
+                self.user_metadata.update({"authorization_endpoint" : link.get('href')})
+
+            if "token_endpoint" in link.get('rel') and self.user_metadata.get("token_endpoint") is None:
+                self.user_metadata.update({"token_endpoint" : link.get('href')})
+        
+            if (self.user_metadata.get("indieauth-metadata") is not None or 
+                (self.user_metadata.get("authorization_endpoint") is not None and 
+                    self.user_metadata.get("token_endpoint") is not None)):
+                return self.user_metadata
+            
+        return self.user_metadata
+    
+    def get_indieauth_server_metadata(self, user_metadata):
+        logger.debug("get_indieauth_server_metadata with %s" % user_metadata)
+        self.user_metadata.update(user_metadata)
+
+        if self.user_metadata is None:
+            raise ServerMetadataException("user_metadata cannot be None.")
+
+        self.indieauth_server_metadata = {
+            "authorization_endpoint": None,
+            "token_endpoint": None
         }
 
-        return (headers, None, 302)
+        logger.debug("indieauth_server_metadata: %s" % self.indieauth_server_metadata)
+
+        indieauth_metadata_endpoint = self.user_metadata.get("indieauth-metadata")
+
+        if indieauth_metadata_endpoint is None:
+            self.indieauth_server_metadata.update({
+                "authorization_endpoint": self.user_metadata.get("authorization_endpoint"),
+                "token_endpoint": self.user_metadata.get("token_endpoint")
+            })
+            return self.indieauth_server_metadata
         
-    def validate_profile_url(self, profile_url ,request):
+        response = requests.get(indieauth_metadata_endpoint)
+
+        try:
+            response.raise_for_status()
+        except:
+            raise ServerMetadataException("Non-successful response from metadata url.")
+
+        self.indieauth_server_metadata.update(response.json())
+        return self.indieauth_server_metadata
+        
+    def validate_profile_url(self, profile_url):
         # Users are identified by a [URL]. Profile URLs MUST have either an 
         # https or http scheme, MUST contain a path component (/ is a valid 
         # path), MUST NOT contain single-dot or double-dot path segments, MAY 
@@ -46,15 +141,13 @@ class Client:
         # MUST NOT be ipv4 or ipv6 addresses.
         #
         # https://indieauth.spec.indieweb.org/#user-profile-url
-        request.profile_url = self.canonicalize_url(profile_url)
-
         validate = URLValidator()
         try:
-            validate(request.profile_url)
+            validate(profile_url)
         except:
             raise InvalidProfileUrlException("Profile url must be a valid url.")
             
-        parsed = urlparse(request.profile_url)
+        parsed = urlparse(profile_url)
 
         if parsed.scheme != "http" and parsed.scheme != "https":
             raise InvalidProfileUrlException("Profile url must be http or https.")
@@ -114,16 +207,22 @@ class Client:
     def get_authorization_endpoint(self, profile_url, request):
         response = requests.get(profile_url)
 
+        logger.debug("Profile url response: %s" % response)
+
         try:
             response.raise_for_status()
-        except:
+        except Exception as e:
+            logger.debug("Profile url exception: %s" % e)
             raise AuthorizationEndpointException("Non-successful response from profile url.")
 
         try:
             indieauth_metadata_endpoint = self.get_indieauth_metadata_endpoint(response)
-        except:
+        except Exception as e:
+            logger.debug("Indieauth metadata exception: %s" % e)
             raise AuthorizationEndpointException("Error getting indieauth metadata endpoint.")
         
+        logger.debug("indieauth metadata endpoint: %s" % indieauth_metadata_endpoint)
+
         # In the event there is no indieauth-metadata URL provided, for 
         # compatibility with previous revisions of IndieAuth, the client SHOULD 
         # look for an HTTP Link header and HTML <link> element with a rel value 
@@ -136,6 +235,7 @@ class Client:
             soup = BeautifulSoup(response.text, 'html.parser')
 
             for link in soup.find_all('link'):
+                logger.debug("link: %s" % link)
                 if link.get('rel') == "authorization_endpoint":
                     return link.get('href')
             
@@ -153,7 +253,7 @@ class Client:
         return content.get("authorization_endpoint")
 
 
-    def get_indieauth_metadata_endpoint(http_response):
+    def get_indieauth_metadata_endpoint(self, http_response):
         # Clients need to discover a few pieces of information when a user signs 
         # in. The client needs to discover the user's indieauth-metadata 
         # endpoint, which provides the location of the IndieAuth server's 
@@ -181,18 +281,25 @@ class Client:
         #
         # https://indieauth.spec.indieweb.org/#discovery-by-clients
 
-        link_headers = http_response.headers['Link']
+        logger.debug("Headers: %s" % http_response.headers)
+        link_headers = http_response.headers.get('Link', "")
+        logger.debug("Link headers: %s" % link_headers)
 
         for header in link_headers.split(","):
+            logger.debug("Header: %s" % header)
             pair = header.split(":")
 
-            if pair[0].trim() == "rel" and pair[1].trim() == "indieauth-metadata":
+            if pair[0].strip() == "rel" and pair[1].strip() == "indieauth-metadata":
+                logger.debug("Link %s: %s" % (pair[0], pair[1]))
                 return pair[1]
         
         soup = BeautifulSoup(http_response.text, 'html.parser')
 
         for link in soup.find_all('link'):
-            if link.get('rel') == "indieauth-metadata":
+            logger.debug("link: %s", link)
+            logger.debug("link rel: %s", link.get('rel'))
+            logger.debug("link href: %s", link.get('href'))
+            if "indieauth-metadata" in link.get('rel'):
                 return link.get('href')
         
         return None
@@ -201,4 +308,10 @@ class InvalidProfileUrlException(Exception):
     pass
 
 class AuthorizationEndpointException(Exception):
+    pass
+
+class UserMetadataException(Exception):
+    pass
+
+class ServerMetadataException(Exception):
     pass

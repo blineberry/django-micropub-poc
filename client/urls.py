@@ -6,5 +6,5 @@ app_name = 'client'
 urlpatterns = [
     path("", views.IndexView.as_view(), name="index"),
     path("metadata", views.metadata, name="metadata"),
-    path("accounts/", include("django.contrib.auth.urls"))
+    path("callback", views.callback, name="oauthcallback"),
 ]
