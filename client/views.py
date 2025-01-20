@@ -31,7 +31,17 @@ class IndexView(View):
             server_metadata = client.get_indieauth_server_metadata(user_metadata)
             logger.debug("server_metadata: %s" % server_metadata)
 
-            url, headers, body = client.prepare_authorization_request(server_metadata.get("authorization_endpoint"), redirect_url=get_redirect_url(request))
+            code_verifier = client.create_code_verifier(128)
+            code_challenge_method = "S256"
+            code_challenge = client.create_code_challenge(code_verifier, code_challenge_method)
+
+            url, headers, body = client.prepare_authorization_request(
+                server_metadata.get("authorization_endpoint"), 
+                redirect_url=get_redirect_url(request),
+                code_challenge=code_challenge,
+                code_challenge_method=code_challenge_method,
+                me=client.user_profile_url
+            )
             logger.debug("url: %s" % url)
             logger.debug("headers: %s" % headers)
             logger.debug("body: %s" % body)
@@ -45,12 +55,16 @@ class IndexView(View):
                 "error": e,
                 "userprofileurl": request.POST.get('user-profile-url')
             })
-        
+
+class CallbackView(View):
+    def get(self, request): 
+        error = request.GET.get("error")
+
+        if error:
+            return HttpResponse("%s: %s" % (error, request.GET.get("error_description")))
 
 def metadata(request):
     return JsonResponse({
         "client_id": request.build_absolute_uri(reverse("client:metadata")),
         "client_uri": request.build_absolute_uri(reverse("client:index"))
     })
-def callback(request):
-    return HttpResponse(None, status=501)
