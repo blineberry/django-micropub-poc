@@ -4,6 +4,7 @@ from django.urls import reverse
 from django.views.generic import View
 from .indieauthclient import IndieAuthClient, Request as IndieRequest
 import logging
+from urllib.parse import urljoin
 
 logger = logging.getLogger(__name__)
 
@@ -66,5 +67,10 @@ class CallbackView(View):
 def metadata(request):
     return JsonResponse({
         "client_id": request.build_absolute_uri(reverse("client:metadata")),
-        "client_uri": request.build_absolute_uri(reverse("client:index"))
+        "client_id": request.build_absolute_uri(reverse("client:metadata")),
+        "client_uri": request.build_absolute_uri(reverse("client:index")),
+        "redirect_uris": [
+            request.build_absolute_uri(reverse("client:oauthcallback")),
+            urljoin("http://localhost:8000", reverse("client:oauthcallback"))
+        ]
     })

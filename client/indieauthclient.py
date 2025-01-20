@@ -1,5 +1,5 @@
 from oauthlib.common import add_params_to_uri
-from urllib.parse import urlparse, urlunparse
+from urllib.parse import urlparse, urlunparse, urljoin
 from django.core.validators import URLValidator
 import ipaddress
 import requests
@@ -69,7 +69,7 @@ class IndieAuthClient(WebApplicationClient):
 
             if pair[0].strip() == "rel" and pair[1].strip() == "indieauth-metadata":
                 logger.debug("Link %s: %s" % (pair[0], pair[1]))
-                self.user_metadata.update({"indieauth-metadata" : pair[1]})
+                self.user_metadata.update({"indieauth-metadata" : urljoin(self.user_profile_url, pair[1])})
                 return self.user_metadata
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -82,14 +82,14 @@ class IndieAuthClient(WebApplicationClient):
             logger.debug("link href: %s", link.get('href'))
 
             if "indieauth-metadata" in link.get('rel') and self.user_metadata.get("indieauth-metadata") is None:
-                self.user_metadata.update({"indieauth-metadata" : link.get('href')})
+                self.user_metadata.update({"indieauth-metadata" : urljoin(self.user_profile_url, link.get('href'))})
                 return self.user_metadata
             
             if "authorization_endpoint" in link.get('rel') and self.user_metadata.get("authorization_endpoint") is None:
-                self.user_metadata.update({"authorization_endpoint" : link.get('href')})
+                self.user_metadata.update({"authorization_endpoint" : urljoin(self.user_profile_url, link.get('href'))})
 
             if "token_endpoint" in link.get('rel') and self.user_metadata.get("token_endpoint") is None:
-                self.user_metadata.update({"token_endpoint" : link.get('href')})
+                self.user_metadata.update({"token_endpoint" : urljoin(self.user_profile_url, link.get('href'))})
         
             if (self.user_metadata.get("indieauth-metadata") is not None or 
                 (self.user_metadata.get("authorization_endpoint") is not None and 
@@ -161,7 +161,7 @@ class IndieAuthClient(WebApplicationClient):
         if parsed.username is not None or parsed.password is not None:
             raise InvalidProfileUrlException("Profile url must not contain a username or password.")
         
-        if parsed.port is not None:
+        if parsed.port is not None and parsed.hostname != "localhost":
             raise InvalidProfileUrlException("Profile url must not contain a port.")
         
         try:
