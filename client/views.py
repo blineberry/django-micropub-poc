@@ -49,8 +49,8 @@ class IndexView(View):
 
 def metadata(request):
     return JsonResponse({
-        "client_id": request.build_absolute_uri(reverse("myapp:clientid")),
-        "client_uri": request.build_absolute_uri(reverse("myapp:index"))
+        "client_id": request.build_absolute_uri(reverse("client:metadata")),
+        "client_uri": request.build_absolute_uri(reverse("client:index"))
     })
 def callback(request):
     return HttpResponse(None, status=501)
