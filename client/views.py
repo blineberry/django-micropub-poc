@@ -82,12 +82,13 @@ class CallbackView(View):
 
         client = IndieAuthClient(get_client_metadata_url(request))
 
-        saved_data = request.session.get("session_key")
+        saved_data = request.session.get(session_key,{})
+        logger.debug("saved_data: %s" % saved_data)
 
         logger.debug("request.build_absolute_uri: %s" % request.build_absolute_uri())
 
         url, headers, body = client.prepare_token_request(
-            saved_data.get("server_metadata").get("token_endpoint"), 
+            saved_data.get("server_metadata",{}).get("token_endpoint"), 
             request.build_absolute_uri(),
             code_verifier=saved_data.get("code_verifier"),
             redirect_url=get_redirect_url(request))
