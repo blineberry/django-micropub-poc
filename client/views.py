@@ -10,7 +10,6 @@ import requests
 logger = logging.getLogger(__name__)
 
 def get_client_metadata_url(request):
-    return "https://djangomicropubpoc.onrender.com/client/metadata"
     return request.build_absolute_uri(reverse("client:metadata"))
 
 def get_redirect_url(request):
@@ -84,6 +83,8 @@ class CallbackView(View):
         client = IndieAuthClient(get_client_metadata_url(request))
 
         saved_data = request.session[session_key]
+
+        logger.debug("request.get_full_path: %s" % request.get_full_path())
 
         url, headers, body = client.prepare_token_request(
             saved_data.get("server_metadata").get("token_endpoint"), 

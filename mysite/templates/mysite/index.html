@@ -4,6 +4,9 @@
         <title>My Site</title>
 
         <link rel="indieauth-metadata" href="https://djangomicropubpoc.onrender.com/indieauth/.well-known/oauth-authorization-server">
+        <link rel="authorization_endpoint" href="{% url 'indieauth:authorization' %}">
+        <link rel="token_endpoint" href="{% url 'indieauth:token' %}">
+        <link rel="micropub" href="{% url 'micropub:micropub' %}">
     </head>
     <body>
         <p>My Site</p>
