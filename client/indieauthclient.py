@@ -22,7 +22,10 @@ class Request:
         pass
 
 class IndieAuthClient(WebApplicationClient):
-    def __init__(self, client_id, user_profile_url, code = None, **kwargs):
+
+    def get_user_metadata(self, user_profile_url):
+        logger.info("get_user_metadata for %s" % user_profile_url)
+
         self.submitted_user_profile_url = user_profile_url
 
         if user_profile_url is None:
@@ -37,11 +40,6 @@ class IndieAuthClient(WebApplicationClient):
 
         if not self.validate_profile_url(user_profile_url):
             raise InvalidProfileUrlException("Profile url failed validation.")
-
-        super().__init__(client_id, code, **kwargs)
-
-    def get_user_metadata(self, user_profile_url):
-        self.user_profile_url = user_profile_url
 
         self.user_metadata = {
             "indieauth-metadata": None,
@@ -99,7 +97,7 @@ class IndieAuthClient(WebApplicationClient):
         return self.user_metadata
     
     def get_indieauth_server_metadata(self, user_metadata):
-        logger.debug("get_indieauth_server_metadata with %s" % user_metadata)
+        logger.debug("get_indieauth_server_metadata for %s" % user_metadata)
         self.user_metadata.update(user_metadata)
 
         if self.user_metadata is None:
@@ -202,6 +200,7 @@ class IndieAuthClient(WebApplicationClient):
             profile_url = profile_url + "/"
             parsed_url = urlparse(profile_url)        
 
+        logger.debug("parsed_url.netloc: %s" % parsed_url.netloc)
         return urlunparse((parsed_url.scheme, parsed_url.netloc.lower(), parsed_url.path, parsed_url.params, parsed_url.query, parsed_url.fragment))
 
     def get_authorization_endpoint(self, profile_url, request):
