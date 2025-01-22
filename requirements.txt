@@ -5,3 +5,4 @@ uvicorn==0.34.0
 requests==2.32.3
 oauthlib==3.2.2
 beautifulsoup4==4.12.3
+mf2py==2.0.1
